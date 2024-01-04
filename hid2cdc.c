@@ -82,11 +82,11 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
               
             } else {
               
-              if(report[i] == 0x4a) esccode[2] = 0x11; // VK_HOME
-              if(report[i] == 0x49) esccode[2] = 0x12; // VK_INSERT
-              if(report[i] == 0x4d) esccode[2] = 0x14; // VK_END
-              if(report[i] == 0x4b) esccode[2] = 0x15; // VK_PRIOR
-              if(report[i] == 0x4e) esccode[2] = 0x16; // VK_NEXT
+              if(report[i] == 0x4a) esccode[2] = 0x31; // VK_HOME
+              if(report[i] == 0x49) esccode[2] = 0x32; // VK_INSERT
+              if(report[i] == 0x4d) esccode[2] = 0x34; // VK_END
+              if(report[i] == 0x4b) esccode[2] = 0x35; // VK_PRIOR
+              if(report[i] == 0x4e) esccode[2] = 0x36; // VK_NEXT
               esccode[3] = 0x7e;
               tuh_cdc_write(0, esccode, 4);
               
