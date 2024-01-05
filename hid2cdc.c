@@ -101,12 +101,14 @@ void cdc_send_key(u8 key) {
       
     }
   } else {
-    if(ctrl && (key == 0x2c || key == 0x2f || key == 0x30 || key == 0x31 || key == 0x35 || key == 0x38)) {
+    if(ctrl && (key == 0x2c || key == 0x2f || key == 0x30 || key == 0x31 || key >= 0x35 && key <= 0x38)) {
       if(key == 0x2c) seq[0] = 0;
       if(key == 0x2f) seq[0] = 0x1b;
       if(key == 0x31) seq[0] = 0x1c;
       if(key == 0x30) seq[0] = 0x1d;
       if(key == 0x35) seq[0] = 0x1e;
+      if(key == 0x36) seq[0] = 0x1c;
+      if(key == 0x37) seq[0] = 0x1e;
       if(key == 0x38) seq[0] = 0x1f;
       cdc_write(1);
       
