@@ -24,15 +24,17 @@ u8 prev_rpt[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 u8 seq[] = { 0, 0, 0, 0, 0 };
 
 void cdc_write(u8 seqsize) {
-  if(tuh_cdc_mounted(0)) {
-    printf(", CDC bytes:");
-    
-    for(u8 i = 0; i < seqsize; i++) {
-      printf(" %02x", seq[i]);
-    }
-    
+  printf(", CDC bytes:");
+  
+  for(u8 i = 0; i < seqsize; i++) {
+    printf(" %02x", seq[i]);
+  }
+  
+  if(tuh_cdc_mounted(0)) {  
     tuh_cdc_write(0, seq, seqsize);
     tuh_cdc_write_flush(0);
+  } else {
+    printf(", CDC not mounted!");
   }
 }
 
@@ -99,11 +101,13 @@ void cdc_send_key(u8 key) {
       
     }
   } else {
-    if(ctrl && (key == 0x2c || key == 0x2f || key == 0x30 || key == 0x31 || key == 0x2c || key == 0x2c)) {
+    if(ctrl && (key == 0x2c || key == 0x2f || key == 0x30 || key == 0x31 || key == 0x35 || key == 0x38)) {
       if(key == 0x2c) seq[0] = 0;
       if(key == 0x2f) seq[0] = 0x1b;
       if(key == 0x31) seq[0] = 0x1c;
       if(key == 0x30) seq[0] = 0x1d;
+      if(key == 0x35) seq[0] = 0x1e;
+      if(key == 0x38) seq[0] = 0x1f;
       cdc_write(1);
       
     } else if(ctrl && key >= 0x04 && key <= 0x1d) {

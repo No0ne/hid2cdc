@@ -18,7 +18,7 @@ pico_sdk_init()
 add_executable(hid2cdc hid2cdc.c)
 
 pico_set_program_name(hid2cdc "hid2cdc")
-pico_set_program_version(hid2cdc "0.3")
+pico_set_program_version(hid2cdc "0.4")
 
 pico_enable_stdio_uart(hid2cdc 1)
 pico_enable_stdio_usb(hid2cdc 0)
