@@ -14,6 +14,7 @@ u8 repeat = 0;
 
 bool blinking = false;
 bool ctrl = false;
+bool alt = false;
 bool shift = false;
 
 u8 kb_addr = 0;
@@ -41,35 +42,40 @@ void cdc_write(u8 seqsize) {
 void cdc_send_key(u8 key) {
   printf("HID code = %02x", key);
   
-  if(key == 0x4c) {
+  if(key == HID_KEY_DELETE) {
     
-    seq[0] = 0x7f;
-    cdc_write(1);
+    if(ctrl && alt) {
+      printf(" resetting...");
+      
+    } else {
+      seq[0] = 0x7f;
+      cdc_write(1);
+    }
     
-  } else if(key >= 0x3a && key <= 0x45) {
+  } else if(key >= HID_KEY_F1 && key <= HID_KEY_F12) {
     
     if(!shift) {
-      if(key == 0x3a) { seq[2] = 0x31; seq[3] = 0x31; } // VK_F1
-      if(key == 0x3b) { seq[2] = 0x31; seq[3] = 0x32; } // VK_F2
-      if(key == 0x3c) { seq[2] = 0x31; seq[3] = 0x33; } // VK_F3
-      if(key == 0x3d) { seq[2] = 0x31; seq[3] = 0x34; } // VK_F4
-      if(key == 0x3e) { seq[2] = 0x31; seq[3] = 0x35; } // VK_F5
-      if(key == 0x3f) { seq[2] = 0x31; seq[3] = 0x37; } // VK_F6
-      if(key == 0x40) { seq[2] = 0x31; seq[3] = 0x38; } // VK_F7
-      if(key == 0x41) { seq[2] = 0x31; seq[3] = 0x39; } // VK_F8
-      if(key == 0x42) { seq[2] = 0x32; seq[3] = 0x30; } // VK_F9
-      if(key == 0x43) { seq[2] = 0x32; seq[3] = 0x31; } // VK_F10
-      if(key == 0x44) { seq[2] = 0x32; seq[3] = 0x33; } // VK_F11
-      if(key == 0x45) { seq[2] = 0x32; seq[3] = 0x34; } // VK_F12
+      if(key == HID_KEY_F1)  { seq[2] = 0x31; seq[3] = 0x31; }
+      if(key == HID_KEY_F2)  { seq[2] = 0x31; seq[3] = 0x32; }
+      if(key == HID_KEY_F3)  { seq[2] = 0x31; seq[3] = 0x33; }
+      if(key == HID_KEY_F4)  { seq[2] = 0x31; seq[3] = 0x34; }
+      if(key == HID_KEY_F5)  { seq[2] = 0x31; seq[3] = 0x35; }
+      if(key == HID_KEY_F6)  { seq[2] = 0x31; seq[3] = 0x37; }
+      if(key == HID_KEY_F7)  { seq[2] = 0x31; seq[3] = 0x38; }
+      if(key == HID_KEY_F8)  { seq[2] = 0x31; seq[3] = 0x39; }
+      if(key == HID_KEY_F9)  { seq[2] = 0x32; seq[3] = 0x30; }
+      if(key == HID_KEY_F10) { seq[2] = 0x32; seq[3] = 0x31; }
+      if(key == HID_KEY_F11) { seq[2] = 0x32; seq[3] = 0x33; }
+      if(key == HID_KEY_F12) { seq[2] = 0x32; seq[3] = 0x34; }
     } else {
-      if(key == 0x3c) { seq[2] = 0x32; seq[3] = 0x35; } // VK_F13
-      if(key == 0x3d) { seq[2] = 0x32; seq[3] = 0x36; } // VK_F14
-      if(key == 0x3e) { seq[2] = 0x32; seq[3] = 0x38; } // VK_F15
-      if(key == 0x3f) { seq[2] = 0x32; seq[3] = 0x39; } // VK_F16
-      if(key == 0x40) { seq[2] = 0x33; seq[3] = 0x31; } // VK_F17
-      if(key == 0x41) { seq[2] = 0x33; seq[3] = 0x32; } // VK_F18
-      if(key == 0x42) { seq[2] = 0x33; seq[3] = 0x33; } // VK_F19
-      if(key == 0x43) { seq[2] = 0x33; seq[3] = 0x34; } // VK_F20
+      if(key == HID_KEY_F3)  { seq[2] = 0x32; seq[3] = 0x35; }
+      if(key == HID_KEY_F4)  { seq[2] = 0x32; seq[3] = 0x36; }
+      if(key == HID_KEY_F5)  { seq[2] = 0x32; seq[3] = 0x38; }
+      if(key == HID_KEY_F6)  { seq[2] = 0x32; seq[3] = 0x39; }
+      if(key == HID_KEY_F7)  { seq[2] = 0x33; seq[3] = 0x31; }
+      if(key == HID_KEY_F8)  { seq[2] = 0x33; seq[3] = 0x32; }
+      if(key == HID_KEY_F9)  { seq[2] = 0x33; seq[3] = 0x33; }
+      if(key == HID_KEY_F10) { seq[2] = 0x33; seq[3] = 0x34; }
     }
     
     seq[0] = 0x1b;
@@ -77,42 +83,45 @@ void cdc_send_key(u8 key) {
     seq[4] = 0x7e;
     cdc_write(5);
     
-  } else if(key >= 0x49 && key <= 0x52) {
+  } else if(key >= HID_KEY_INSERT && key <= HID_KEY_ARROW_UP) {
     seq[0] = 0x1b;
     seq[1] = 0x5b;
     
-    if(key >= 0x4f) {
+    if(key >= HID_KEY_ARROW_RIGHT) {
       
-      if(key == 0x52) seq[2] = 0x41; // VK_UP
-      if(key == 0x51) seq[2] = 0x42; // VK_DOWN
-      if(key == 0x4f) seq[2] = 0x43; // VK_RIGHT
-      if(key == 0x50) seq[2] = 0x44; // VK_LEFT
+      if(key == HID_KEY_ARROW_UP)    seq[2] = 0x41;
+      if(key == HID_KEY_ARROW_DOWN)  seq[2] = 0x42;
+      if(key == HID_KEY_ARROW_RIGHT) seq[2] = 0x43;
+      if(key == HID_KEY_ARROW_LEFT)  seq[2] = 0x44;
       cdc_write(3);
       
     } else {
       
-      if(key == 0x4a) seq[2] = 0x31; // VK_HOME
-      if(key == 0x49) seq[2] = 0x32; // VK_INSERT
-      if(key == 0x4d) seq[2] = 0x34; // VK_END
-      if(key == 0x4b) seq[2] = 0x35; // VK_PRIOR
-      if(key == 0x4e) seq[2] = 0x36; // VK_NEXT
+      if(key == HID_KEY_HOME)      seq[2] = 0x31;
+      if(key == HID_KEY_INSERT)    seq[2] = 0x32;
+      if(key == HID_KEY_END)       seq[2] = 0x34;
+      if(key == HID_KEY_PAGE_UP)   seq[2] = 0x35;
+      if(key == HID_KEY_PAGE_DOWN) seq[2] = 0x36;
       seq[3] = 0x7e;
       cdc_write(4);
       
     }
   } else {
-    if(ctrl && (key == 0x2c || key == 0x2f || key == 0x30 || key == 0x31 || key >= 0x35 && key <= 0x38)) {
-      if(key == 0x2c) seq[0] = 0;
-      if(key == 0x2f) seq[0] = 0x1b;
-      if(key == 0x31) seq[0] = 0x1c;
-      if(key == 0x30) seq[0] = 0x1d;
-      if(key == 0x35) seq[0] = 0x1e;
-      if(key == 0x36) seq[0] = 0x1c;
-      if(key == 0x37) seq[0] = 0x1e;
-      if(key == 0x38) seq[0] = 0x1f;
+    if(ctrl && (key == HID_KEY_SPACE ||
+      key >= HID_KEY_BRACKET_LEFT && key <= HID_KEY_BACKSLASH ||
+      key >= HID_KEY_GRAVE && key <= HID_KEY_SLASH)) {
+      
+      if(key == HID_KEY_SPACE)         seq[0] = 0x00;
+      if(key == HID_KEY_BRACKET_LEFT)  seq[0] = 0x1b;
+      if(key == HID_KEY_BACKSLASH)     seq[0] = 0x1c;
+      if(key == HID_KEY_BRACKET_RIGHT) seq[0] = 0x1d;
+      if(key == HID_KEY_GRAVE)         seq[0] = 0x1e;
+      if(key == HID_KEY_COMMA)         seq[0] = 0x1c;
+      if(key == HID_KEY_PERIOD)        seq[0] = 0x1e;
+      if(key == HID_KEY_SLASH)         seq[0] = 0x1f;
       cdc_write(1);
       
-    } else if(ctrl && key >= 0x04 && key <= 0x1d) {
+    } else if(ctrl && key >= HID_KEY_A && key <= HID_KEY_Z) {
       seq[0] = key - 3;
       cdc_write(1);
       
@@ -135,7 +144,7 @@ void kb_set_leds() {
 
 void kb_set_led(u8 led) {
   kb_leds ^= led;
-  if(led == 2) shift = kb_leds & 0x2;
+  if(led == 2) shift = kb_leds & 2;
   kb_set_leds();
 }
 
@@ -170,18 +179,23 @@ int64_t repeat_callback(alarm_id_t id, void *user_data) {
   return 0;
 }
 
-void kb_send_key(u8 key, bool state, u8 modifiers) {
-  if(key > 0x73 && key < 0xe0 && key > 0xe7) return;
+void kb_send_key(u8 key, bool state) {
+  if(key > HID_KEY_KEYPAD_EQUAL &&
+     key < HID_KEY_CONTROL_LEFT &&
+     key > HID_KEY_GUI_RIGHT) return;
   
   if(state) {
-    if(key == 0x53) kb_set_led(1);
-    if(key == 0x39) kb_set_led(2);
-    if(key == 0x47) kb_set_led(4);
+    if(key == HID_KEY_NUM_LOCK) kb_set_led(1);
+    if(key == HID_KEY_CAPS_LOCK) kb_set_led(2);
+    if(key == HID_KEY_SCROLL_LOCK) kb_set_led(4);
     
     repeat = key;
     if(repeater) cancel_alarm(repeater);
     
-    if(key < 0x73 && key != 0x53 && key != 0x39 && key != 0x47) {
+    if(key < HID_KEY_KEYPAD_EQUAL &&
+      key != HID_KEY_NUM_LOCK &&
+      key != HID_KEY_CAPS_LOCK &&
+      key != HID_KEY_SCROLL_LOCK) {
       repeater = add_alarm_in_ms(delay_ms, repeat_callback, NULL, false);
       cdc_send_key(key);
     }
@@ -189,8 +203,9 @@ void kb_send_key(u8 key, bool state, u8 modifiers) {
     if(key == repeat) repeat = 0;
   }
   
-  if(key == 0xe0 || key == 0xe4) ctrl = state;
-  if((key == 0xe1 || key == 0xe5) && !(kb_leds & 0x2)) shift = state;
+  if(key == HID_KEY_CONTROL_LEFT || key == HID_KEY_CONTROL_RIGHT) ctrl = state;
+  if(key == HID_KEY_ALT_LEFT || key == HID_KEY_ALT_RIGHT) alt = state;
+  if((key == HID_KEY_SHIFT_LEFT || key == HID_KEY_SHIFT_RIGHT) && !(kb_leds & 2)) shift = state;
 }
 
 void tuh_cdc_mount_cb(u8 idx) {
@@ -245,8 +260,8 @@ void tuh_hid_report_received_cb(u8 dev_addr, u8 instance, u8 const* report, u16 
       u8 pbits = prev_rpt[0];
       
       for(u8 j = 0; j < 8; j++) {
-        if((rbits & 0x1) != (pbits & 0x1)) {
-          kb_send_key(j + 0xe0, rbits & 0x1, report[0]);
+        if((rbits & 1) != (pbits & 1)) {
+          kb_send_key(j + 0xe0, rbits & 1);
         }
         
         rbits = rbits >> 1;
@@ -266,7 +281,7 @@ void tuh_hid_report_received_cb(u8 dev_addr, u8 instance, u8 const* report, u16 
         }
         
         if(brk) {
-          kb_send_key(prev_rpt[i], false, report[0]);
+          kb_send_key(prev_rpt[i], false);
         }
       }
       
@@ -281,7 +296,7 @@ void tuh_hid_report_received_cb(u8 dev_addr, u8 instance, u8 const* report, u16 
         }
         
         if(make) {
-          kb_send_key(report[i], true, report[0]);
+          kb_send_key(report[i], true);
         }
       }
     }
