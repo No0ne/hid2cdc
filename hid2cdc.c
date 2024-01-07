@@ -1,3 +1,5 @@
+#include "hardware/watchdog.h"
+#include "hardware/gpio.h"
 #include "bsp/board.h"
 #include "tusb.h"
 
@@ -5,6 +7,8 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 
+u8 const ESC = 0x1b;
+u8 const DEL = 0x7f;
 u8 const keycode2ascii[128][2] = { HID_KEYCODE_TO_ASCII };
 u32 const repeat_us = 50000;
 u16 const delay_ms = 250;
@@ -45,64 +49,67 @@ void cdc_send_key(u8 key) {
   if(key == HID_KEY_DELETE) {
     
     if(ctrl && alt) {
-      printf(" resetting...");
-      
+      printf(" + ctrl + alt, resetting...\n\n");
+      gpio_put(CTRLALTDEL, 0);
+      board_led_write(0);
+      watchdog_enable(100, false);
+      while(1);
     } else {
-      seq[0] = 0x7f;
+      seq[0] = DEL;
       cdc_write(1);
     }
     
   } else if(key >= HID_KEY_F1 && key <= HID_KEY_F12) {
     
     if(!shift) {
-      if(key == HID_KEY_F1)  { seq[2] = 0x31; seq[3] = 0x31; }
-      if(key == HID_KEY_F2)  { seq[2] = 0x31; seq[3] = 0x32; }
-      if(key == HID_KEY_F3)  { seq[2] = 0x31; seq[3] = 0x33; }
-      if(key == HID_KEY_F4)  { seq[2] = 0x31; seq[3] = 0x34; }
-      if(key == HID_KEY_F5)  { seq[2] = 0x31; seq[3] = 0x35; }
-      if(key == HID_KEY_F6)  { seq[2] = 0x31; seq[3] = 0x37; }
-      if(key == HID_KEY_F7)  { seq[2] = 0x31; seq[3] = 0x38; }
-      if(key == HID_KEY_F8)  { seq[2] = 0x31; seq[3] = 0x39; }
-      if(key == HID_KEY_F9)  { seq[2] = 0x32; seq[3] = 0x30; }
-      if(key == HID_KEY_F10) { seq[2] = 0x32; seq[3] = 0x31; }
-      if(key == HID_KEY_F11) { seq[2] = 0x32; seq[3] = 0x33; }
-      if(key == HID_KEY_F12) { seq[2] = 0x32; seq[3] = 0x34; }
+      if(key == HID_KEY_F1)  { seq[2] = '1'; seq[3] = '1'; }
+      if(key == HID_KEY_F2)  { seq[2] = '1'; seq[3] = '2'; }
+      if(key == HID_KEY_F3)  { seq[2] = '1'; seq[3] = '3'; }
+      if(key == HID_KEY_F4)  { seq[2] = '1'; seq[3] = '4'; }
+      if(key == HID_KEY_F5)  { seq[2] = '1'; seq[3] = '5'; }
+      if(key == HID_KEY_F6)  { seq[2] = '1'; seq[3] = '7'; }
+      if(key == HID_KEY_F7)  { seq[2] = '1'; seq[3] = '8'; }
+      if(key == HID_KEY_F8)  { seq[2] = '1'; seq[3] = '9'; }
+      if(key == HID_KEY_F9)  { seq[2] = '2'; seq[3] = '0'; }
+      if(key == HID_KEY_F10) { seq[2] = '2'; seq[3] = '1'; }
+      if(key == HID_KEY_F11) { seq[2] = '2'; seq[3] = '3'; }
+      if(key == HID_KEY_F12) { seq[2] = '2'; seq[3] = '4'; }
     } else {
-      if(key == HID_KEY_F3)  { seq[2] = 0x32; seq[3] = 0x35; }
-      if(key == HID_KEY_F4)  { seq[2] = 0x32; seq[3] = 0x36; }
-      if(key == HID_KEY_F5)  { seq[2] = 0x32; seq[3] = 0x38; }
-      if(key == HID_KEY_F6)  { seq[2] = 0x32; seq[3] = 0x39; }
-      if(key == HID_KEY_F7)  { seq[2] = 0x33; seq[3] = 0x31; }
-      if(key == HID_KEY_F8)  { seq[2] = 0x33; seq[3] = 0x32; }
-      if(key == HID_KEY_F9)  { seq[2] = 0x33; seq[3] = 0x33; }
-      if(key == HID_KEY_F10) { seq[2] = 0x33; seq[3] = 0x34; }
+      if(key == HID_KEY_F3)  { seq[2] = '2'; seq[3] = '5'; }
+      if(key == HID_KEY_F4)  { seq[2] = '2'; seq[3] = '6'; }
+      if(key == HID_KEY_F5)  { seq[2] = '2'; seq[3] = '8'; }
+      if(key == HID_KEY_F6)  { seq[2] = '2'; seq[3] = '9'; }
+      if(key == HID_KEY_F7)  { seq[2] = '3'; seq[3] = '1'; }
+      if(key == HID_KEY_F8)  { seq[2] = '3'; seq[3] = '2'; }
+      if(key == HID_KEY_F9)  { seq[2] = '3'; seq[3] = '3'; }
+      if(key == HID_KEY_F10) { seq[2] = '3'; seq[3] = '4'; }
     }
     
-    seq[0] = 0x1b;
-    seq[1] = 0x5b;
-    seq[4] = 0x7e;
+    seq[0] = ESC;
+    seq[1] = '[';
+    seq[4] = '~';
     cdc_write(5);
     
   } else if(key >= HID_KEY_INSERT && key <= HID_KEY_ARROW_UP) {
-    seq[0] = 0x1b;
-    seq[1] = 0x5b;
+    seq[0] = ESC;
+    seq[1] = '[';
     
     if(key >= HID_KEY_ARROW_RIGHT) {
       
-      if(key == HID_KEY_ARROW_UP)    seq[2] = 0x41;
-      if(key == HID_KEY_ARROW_DOWN)  seq[2] = 0x42;
-      if(key == HID_KEY_ARROW_RIGHT) seq[2] = 0x43;
-      if(key == HID_KEY_ARROW_LEFT)  seq[2] = 0x44;
+      if(key == HID_KEY_ARROW_UP)    seq[2] = 'A';
+      if(key == HID_KEY_ARROW_DOWN)  seq[2] = 'B';
+      if(key == HID_KEY_ARROW_RIGHT) seq[2] = 'C';
+      if(key == HID_KEY_ARROW_LEFT)  seq[2] = 'D';
       cdc_write(3);
       
     } else {
       
-      if(key == HID_KEY_HOME)      seq[2] = 0x31;
-      if(key == HID_KEY_INSERT)    seq[2] = 0x32;
-      if(key == HID_KEY_END)       seq[2] = 0x34;
-      if(key == HID_KEY_PAGE_UP)   seq[2] = 0x35;
-      if(key == HID_KEY_PAGE_DOWN) seq[2] = 0x36;
-      seq[3] = 0x7e;
+      if(key == HID_KEY_HOME)      seq[2] = '1';
+      if(key == HID_KEY_INSERT)    seq[2] = '2';
+      if(key == HID_KEY_END)       seq[2] = '4';
+      if(key == HID_KEY_PAGE_UP)   seq[2] = '5';
+      if(key == HID_KEY_PAGE_DOWN) seq[2] = '6';
+      seq[3] = '~';
       cdc_write(4);
       
     }
@@ -122,7 +129,7 @@ void cdc_send_key(u8 key) {
       cdc_write(1);
       
     } else if(ctrl && key >= HID_KEY_A && key <= HID_KEY_Z) {
-      seq[0] = key - 3;
+      seq[0] = key + 1 - HID_KEY_A;
       cdc_write(1);
       
     } else {
@@ -261,7 +268,7 @@ void tuh_hid_report_received_cb(u8 dev_addr, u8 instance, u8 const* report, u16 
       
       for(u8 j = 0; j < 8; j++) {
         if((rbits & 1) != (pbits & 1)) {
-          kb_send_key(j + 0xe0, rbits & 1);
+          kb_send_key(HID_KEY_CONTROL_LEFT + j, rbits & 1);
         }
         
         rbits = rbits >> 1;
@@ -311,6 +318,11 @@ void tuh_hid_report_received_cb(u8 dev_addr, u8 instance, u8 const* report, u16 
 void main() {
   board_init();
   tuh_init(BOARD_TUH_RHPORT);
+  
+  gpio_init(CTRLALTDEL);
+  gpio_set_dir(CTRLALTDEL, GPIO_OUT);
+  gpio_put(CTRLALTDEL, 1);
+  board_led_write(1);
   
   printf("\n%s-%s\n", PICO_PROGRAM_NAME, PICO_PROGRAM_VERSION_STRING);
   
