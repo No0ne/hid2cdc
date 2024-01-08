@@ -7,7 +7,12 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 
+u8 const NUL = 0x00;
 u8 const ESC = 0x1b;
+u8 const FS = 0x1c;
+u8 const GS = 0x1d;
+u8 const RS = 0x1e;
+u8 const US = 0x1f;
 u8 const DEL = 0x7f;
 u8 const keycode2ascii[128][2] = { HID_KEYCODE_TO_ASCII };
 u32 const repeat_us = 50000;
@@ -116,16 +121,16 @@ void cdc_send_key(u8 key) {
   } else {
     if(ctrl && (key == HID_KEY_SPACE ||
       key >= HID_KEY_BRACKET_LEFT && key <= HID_KEY_BACKSLASH ||
-      key >= HID_KEY_GRAVE && key <= HID_KEY_SLASH)) {
+      key >= HID_KEY_GRAVE        && key <= HID_KEY_SLASH)) {
       
-      if(key == HID_KEY_SPACE)         seq[0] = 0x00;
-      if(key == HID_KEY_BRACKET_LEFT)  seq[0] = 0x1b;
-      if(key == HID_KEY_BACKSLASH)     seq[0] = 0x1c;
-      if(key == HID_KEY_BRACKET_RIGHT) seq[0] = 0x1d;
-      if(key == HID_KEY_GRAVE)         seq[0] = 0x1e;
-      if(key == HID_KEY_COMMA)         seq[0] = 0x1c;
-      if(key == HID_KEY_PERIOD)        seq[0] = 0x1e;
-      if(key == HID_KEY_SLASH)         seq[0] = 0x1f;
+      if(key == HID_KEY_SPACE)         seq[0] = NUL;
+      if(key == HID_KEY_BRACKET_LEFT)  seq[0] = ESC;
+      if(key == HID_KEY_BACKSLASH)     seq[0] = FS;
+      if(key == HID_KEY_COMMA)         seq[0] = FS;
+      if(key == HID_KEY_BRACKET_RIGHT) seq[0] = GS;
+      if(key == HID_KEY_GRAVE)         seq[0] = RS;
+      if(key == HID_KEY_PERIOD)        seq[0] = RS;
+      if(key == HID_KEY_SLASH)         seq[0] = US;
       cdc_write(1);
       
     } else if(ctrl && key >= HID_KEY_A && key <= HID_KEY_Z) {
@@ -134,6 +139,11 @@ void cdc_send_key(u8 key) {
       
     } else {
       seq[0] = keycode2ascii[key][shift];
+      
+      if(kb_leds & KEYBOARD_LED_CAPSLOCK && seq[0] >= 'a' && seq[0] <= 'z') {
+        seq[0] &= '_';
+      }
+      
       cdc_write(1);
       
     }
@@ -151,13 +161,12 @@ void kb_set_leds() {
 
 void kb_set_led(u8 led) {
   kb_leds ^= led;
-  if(led == 2) shift = kb_leds & 2;
   kb_set_leds();
 }
 
 int64_t blink_callback(alarm_id_t id, void *user_data) {
   if(blinking) {
-    kb_leds = 7;
+    kb_leds = KEYBOARD_LED_NUMLOCK | KEYBOARD_LED_CAPSLOCK | KEYBOARD_LED_SCROLLLOCK;
     kb_set_leds();
     blinking = false;
     return 500000;
@@ -172,6 +181,7 @@ void kb_reset() {
   repeat = 0;
   blinking = true;
   ctrl = false;
+  alt = false;
   shift = false;
   add_alarm_in_ms(50, blink_callback, NULL, false);
 }
@@ -192,17 +202,19 @@ void kb_send_key(u8 key, bool state) {
      key > HID_KEY_GUI_RIGHT) return;
   
   if(state) {
-    if(key == HID_KEY_NUM_LOCK) kb_set_led(1);
-    if(key == HID_KEY_CAPS_LOCK) kb_set_led(2);
-    if(key == HID_KEY_SCROLL_LOCK) kb_set_led(4);
-    
     repeat = key;
     if(repeater) cancel_alarm(repeater);
     
-    if(key < HID_KEY_KEYPAD_EQUAL &&
-      key != HID_KEY_NUM_LOCK &&
-      key != HID_KEY_CAPS_LOCK &&
-      key != HID_KEY_SCROLL_LOCK) {
+    if(key == HID_KEY_NUM_LOCK) {
+      kb_set_led(KEYBOARD_LED_NUMLOCK);
+      
+    } else if(key == HID_KEY_CAPS_LOCK) {
+      kb_set_led(KEYBOARD_LED_CAPSLOCK);
+      
+    } else if(key == HID_KEY_SCROLL_LOCK) {
+      //kb_set_led(KEYBOARD_LED_SCROLLLOCK);
+    
+    } else if(key < HID_KEY_KEYPAD_EQUAL) {
       repeater = add_alarm_in_ms(delay_ms, repeat_callback, NULL, false);
       cdc_send_key(key);
     }
@@ -211,8 +223,8 @@ void kb_send_key(u8 key, bool state) {
   }
   
   if(key == HID_KEY_CONTROL_LEFT || key == HID_KEY_CONTROL_RIGHT) ctrl = state;
-  if(key == HID_KEY_ALT_LEFT || key == HID_KEY_ALT_RIGHT) alt = state;
-  if((key == HID_KEY_SHIFT_LEFT || key == HID_KEY_SHIFT_RIGHT) && !(kb_leds & 2)) shift = state;
+  if(key == HID_KEY_ALT_LEFT     || key == HID_KEY_ALT_RIGHT    ) alt = state;
+  if(key == HID_KEY_SHIFT_LEFT   || key == HID_KEY_SHIFT_RIGHT  ) shift = state;
 }
 
 void tuh_cdc_mount_cb(u8 idx) {
@@ -318,12 +330,11 @@ void tuh_hid_report_received_cb(u8 dev_addr, u8 instance, u8 const* report, u16 
 void main() {
   board_init();
   tuh_init(BOARD_TUH_RHPORT);
-  
   gpio_init(CTRLALTDEL);
   gpio_set_dir(CTRLALTDEL, GPIO_OUT);
+  
   gpio_put(CTRLALTDEL, 1);
   board_led_write(1);
-  
   printf("\n%s-%s\n", PICO_PROGRAM_NAME, PICO_PROGRAM_VERSION_STRING);
   
   while(1) {
