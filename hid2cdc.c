@@ -1,3 +1,28 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2024 No0ne (https://github.com/No0ne)
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ */
+
 #include "hardware/watchdog.h"
 #include "hardware/gpio.h"
 #include "bsp/board.h"
@@ -7,6 +32,10 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 
+u8 const lower = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ','-','=','[',']','\\','#',';','\'','`',',','.','/' };
+u8 const upper = { '!','@','#','$','%','^','&','*','(',')','\r','\x1b','\b','\t',' ','_','+','{','}','|', '~',':','\"','~','<','>','?' };
+u8 const numpd = { '/','*','-','+','\r','1','2','3','4','5','6','7','8','9','0','.','e' };
+
 u8 const NUL = 0x00;
 u8 const ESC = 0x1b;
 u8 const FS = 0x1c;
@@ -14,12 +43,11 @@ u8 const GS = 0x1d;
 u8 const RS = 0x1e;
 u8 const US = 0x1f;
 u8 const DEL = 0x7f;
-u8 const keycode2ascii[128][2] = { HID_KEYCODE_TO_ASCII };
-u32 const repeat_us = 50000;
-u16 const delay_ms = 250;
 
 alarm_id_t repeater;
 u8 repeat = 0;
+u16 const delay_ms = 250;
+u32 const repeat_us = 50000;
 
 bool blinking = false;
 bool ctrl = false;
@@ -96,6 +124,7 @@ void cdc_send_key(u8 key) {
     cdc_write(5);
     
   } else if(key >= HID_KEY_INSERT && key <= HID_KEY_ARROW_UP) {
+    
     seq[0] = ESC;
     seq[1] = '[';
     
@@ -118,35 +147,56 @@ void cdc_send_key(u8 key) {
       cdc_write(4);
       
     }
-  } else {
-    if(ctrl && (key == HID_KEY_SPACE ||
-      key >= HID_KEY_BRACKET_LEFT && key <= HID_KEY_BACKSLASH ||
-      key >= HID_KEY_GRAVE        && key <= HID_KEY_SLASH)) {
+  } else if(ctrl && (key == HID_KEY_SPACE ||
+    key >= HID_KEY_BRACKET_LEFT && key <= HID_KEY_BACKSLASH ||
+    key >= HID_KEY_GRAVE        && key <= HID_KEY_SLASH)) {
+    
+    if(key == HID_KEY_SPACE)         seq[0] = NUL;
+    if(key == HID_KEY_BRACKET_LEFT)  seq[0] = ESC;
+    if(key == HID_KEY_BACKSLASH)     seq[0] = FS;
+    if(key == HID_KEY_COMMA)         seq[0] = FS;
+    if(key == HID_KEY_BRACKET_RIGHT) seq[0] = GS;
+    if(key == HID_KEY_GRAVE)         seq[0] = RS;
+    if(key == HID_KEY_PERIOD)        seq[0] = RS;
+    if(key == HID_KEY_SLASH)         seq[0] = US;
+    cdc_write(1);
+    
+  } else if(key >= HID_KEY_A && key <= HID_KEY_Z) {
+    
+    if(QWERTZ && key == HID_KEY_Y) {
+      key = HID_KEY_Z;
+    } else if(QWERTZ && key == HID_KEY_Z) {
+      key = HID_KEY_Y;
+    }
+    
+    key -= HID_KEY_A;
+    
+    if(ctrl) {
+      seq[0] = key + 1;
       
-      if(key == HID_KEY_SPACE)         seq[0] = NUL;
-      if(key == HID_KEY_BRACKET_LEFT)  seq[0] = ESC;
-      if(key == HID_KEY_BACKSLASH)     seq[0] = FS;
-      if(key == HID_KEY_COMMA)         seq[0] = FS;
-      if(key == HID_KEY_BRACKET_RIGHT) seq[0] = GS;
-      if(key == HID_KEY_GRAVE)         seq[0] = RS;
-      if(key == HID_KEY_PERIOD)        seq[0] = RS;
-      if(key == HID_KEY_SLASH)         seq[0] = US;
-      cdc_write(1);
-      
-    } else if(ctrl && key >= HID_KEY_A && key <= HID_KEY_Z) {
-      seq[0] = key + 1 - HID_KEY_A;
-      cdc_write(1);
+    } else if(shift || kb_leds & KEYBOARD_LED_CAPSLOCK) {
+      seq[0] = key + 'A';
       
     } else {
-      seq[0] = keycode2ascii[key][shift];
-      
-      if(kb_leds & KEYBOARD_LED_CAPSLOCK && seq[0] >= 'a' && seq[0] <= 'z') {
-        seq[0] &= '_';
-      }
-      
-      cdc_write(1);
-      
+      seq[0] = key + 'a';
     }
+    
+    cdc_write(1);
+    
+  } else if(key >= HID_KEY_1 && key <= HID_KEY_SLASH) {
+    
+    if(shift) {
+      seq[0] = upper[key - HID_KEY_1];
+    } else {
+      seq[0] = lower[key - HID_KEY_1];
+    }
+    cdc_write(1);
+    
+  } else if(key >= HID_KEY_KEYPAD_DIVIDE && key <= HID_KEY_EUROPE_2) {
+    
+    seq[0] = numpd[key - HID_KEY_KEYPAD_DIVIDE];
+    cdc_write(1);
+    
   }
   
   printf("\n");
@@ -197,7 +247,7 @@ int64_t repeat_callback(alarm_id_t id, void *user_data) {
 }
 
 void kb_send_key(u8 key, bool state) {
-  if(key > HID_KEY_KEYPAD_EQUAL &&
+  if(key > HID_KEY_EUROPE_2 &&
      key < HID_KEY_CONTROL_LEFT &&
      key > HID_KEY_GUI_RIGHT) return;
   
@@ -213,8 +263,8 @@ void kb_send_key(u8 key, bool state) {
       
     } else if(key == HID_KEY_SCROLL_LOCK) {
       //kb_set_led(KEYBOARD_LED_SCROLLLOCK);
-    
-    } else if(key < HID_KEY_KEYPAD_EQUAL) {
+      
+    } else if(key <= HID_KEY_EUROPE_2) {
       repeater = add_alarm_in_ms(delay_ms, repeat_callback, NULL, false);
       cdc_send_key(key);
     }
