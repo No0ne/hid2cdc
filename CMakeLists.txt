@@ -18,7 +18,7 @@ pico_sdk_init()
 add_executable(hid2cdc hid2cdc.c)
 
 add_compile_definitions(CTRLALTDEL=3) # ctrl-alt-del reset output gpio
-#add_compile_definitions(QWERTZ) # qwertz keyboard
+add_compile_definitions(QWERTZ) # qwertz keyboard
 
 pico_set_program_name(hid2cdc "hid2cdc")
 pico_set_program_version(hid2cdc "0.9")

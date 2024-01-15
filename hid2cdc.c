@@ -297,7 +297,7 @@ int64_t repeat_callback(alarm_id_t id, void *user_data) {
 
 void kb_send_key(u8 key, bool state) {
   if(key > HID_KEY_EUROPE_2 &&
-     key < HID_KEY_CONTROL_LEFT &&
+     key < HID_KEY_CONTROL_LEFT ||
      key > HID_KEY_GUI_RIGHT) return;
   
   if(state) {
