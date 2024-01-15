@@ -32,17 +32,20 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 
-u8 const lower[] = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ','-','=','[',']','\\','#',';','\'','`',',','.','/' };
-u8 const upper[] = { '!','@','#','$','%','^','&','*','(',')','\r','\x1b','\b','\t',' ','_','+','{','}','|', '~',':','\"','~','<','>','?' };
-u8 const numpd[] = { '/','*','-','+','\r','1','2','3','4','5','6','7','8','9','0','.','e' };
+#ifdef QWERTZ
+  u8 const lower[] = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ',0x0,0x0,0x0,'+',0x0, '#',0x0,0x0,'^',',','.','-' };
+  u8 const upper[] = { '!','"',0x0,'$','%','&','/','(',')','=','\r','\e','\b','\t',' ','?',0x0,0x0,'*',0x0,'\'',0x0,0x0,'`',';',':','_' };
+  u8 const numpd[] = { '/','*','-','+','\r','1','2','3','4','5','6','7','8','9','0',',' };
+#else
+  u8 const lower[] = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ','-','=','[',']','\\',0x0,';','\'','`',',','.','/' };
+  u8 const upper[] = { '!','@','#','$','%','^','&','*','(',')','\r','\e','\b','\t',' ','_','+','{','}','|', 0x0,':','\"','~','<','>','?' };
+  u8 const numpd[] = { '/','*','-','+','\r','1','2','3','4','5','6','7','8','9','0','.' };
+#endif
 
-u8 const NUL = 0x00;
-u8 const ESC = 0x1b;
 u8 const FS = 0x1c;
 u8 const GS = 0x1d;
 u8 const RS = 0x1e;
 u8 const US = 0x1f;
-u8 const DEL = 0x7f;
 
 alarm_id_t repeater;
 u8 repeat = 0;
@@ -53,6 +56,7 @@ bool blinking = false;
 bool ctrl = false;
 bool alt = false;
 bool shift = false;
+bool altgr = false;
 
 u8 kb_addr = 0;
 u8 kb_inst = 0;
@@ -79,18 +83,39 @@ void cdc_write(u8 seqsize) {
 void cdc_send_key(u8 key) {
   printf("HID code = %02x", key);
   
-  if(key == HID_KEY_DELETE) {
+  if(key == HID_KEY_DELETE || key == HID_KEY_KEYPAD_DECIMAL && !(kb_leds & KEYBOARD_LED_NUMLOCK)) {
     
-    if(ctrl && alt) {
+    if(ctrl && (alt || altgr)) {
       printf(" + ctrl + alt, resetting...\n\n");
       gpio_put(CTRLALTDEL, 0);
       board_led_write(0);
       watchdog_enable(100, false);
       while(1);
     } else {
-      seq[0] = DEL;
+      seq[0] = 0x7f;
       cdc_write(1);
     }
+    
+  } else if(key == HID_KEY_EUROPE_2) {
+    #ifdef QWERTZ
+      if(altgr) {
+        seq[0] = '|';
+      } else if(shift) {
+        seq[0] = '>';
+      } else {
+        seq[0] = '<';
+      }
+      cdc_write(1);
+    #endif
+  } else if(altgr && (key >= HID_KEY_7 && key <= HID_KEY_0 || key == HID_KEY_MINUS || key == HID_KEY_BRACKET_RIGHT)) {
+    
+    if(key == HID_KEY_7) seq[0] = '{';
+    if(key == HID_KEY_8) seq[0] = '[';
+    if(key == HID_KEY_9) seq[0] = ']';
+    if(key == HID_KEY_0) seq[0] = '}';
+    if(key == HID_KEY_MINUS) seq[0] = '\\';
+    if(key == HID_KEY_BRACKET_RIGHT) seq[0] = '~';
+    cdc_write(1);
     
   } else if(key >= HID_KEY_F1 && key <= HID_KEY_F12) {
     
@@ -121,41 +146,38 @@ void cdc_send_key(u8 key) {
     if(key == HID_KEY_F11) { seq[2] = '2'; seq[3] = '3'; }
     if(key == HID_KEY_F12) { seq[2] = '2'; seq[3] = '4'; }
     
-    seq[0] = ESC;
+    seq[0] = '\e';
     seq[1] = '[';
     seq[4] = '~';
     cdc_write(5);
     
   } else if(key >= HID_KEY_INSERT && key <= HID_KEY_ARROW_UP) {
     
-    seq[0] = ESC;
+    seq[0] = '\e';
     seq[1] = '[';
+    seq[3] = '~';
     
     if(key >= HID_KEY_ARROW_RIGHT) {
-      
       if(key == HID_KEY_ARROW_UP)    seq[2] = 'A';
       if(key == HID_KEY_ARROW_DOWN)  seq[2] = 'B';
       if(key == HID_KEY_ARROW_RIGHT) seq[2] = 'C';
       if(key == HID_KEY_ARROW_LEFT)  seq[2] = 'D';
       cdc_write(3);
-      
     } else {
-      
       if(key == HID_KEY_HOME)      seq[2] = '1';
       if(key == HID_KEY_INSERT)    seq[2] = '2';
       if(key == HID_KEY_END)       seq[2] = '4';
       if(key == HID_KEY_PAGE_UP)   seq[2] = '5';
       if(key == HID_KEY_PAGE_DOWN) seq[2] = '6';
-      seq[3] = '~';
       cdc_write(4);
-      
     }
+    
   } else if(ctrl && (key == HID_KEY_SPACE ||
     key >= HID_KEY_BRACKET_LEFT && key <= HID_KEY_BACKSLASH ||
     key >= HID_KEY_GRAVE        && key <= HID_KEY_SLASH)) {
     
-    if(key == HID_KEY_SPACE)         seq[0] = NUL;
-    if(key == HID_KEY_BRACKET_LEFT)  seq[0] = ESC;
+    if(key == HID_KEY_SPACE)         seq[0] = 0;
+    if(key == HID_KEY_BRACKET_LEFT)  seq[0] = '\e';
     if(key == HID_KEY_BACKSLASH)     seq[0] = FS;
     if(key == HID_KEY_COMMA)         seq[0] = FS;
     if(key == HID_KEY_BRACKET_RIGHT) seq[0] = GS;
@@ -166,11 +188,13 @@ void cdc_send_key(u8 key) {
     
   } else if(key >= HID_KEY_A && key <= HID_KEY_Z) {
     
-    if(QWERTZ && key == HID_KEY_Y) {
-      key = HID_KEY_Z;
-    } else if(QWERTZ && key == HID_KEY_Z) {
-      key = HID_KEY_Y;
-    }
+    #ifdef QWERTZ
+      if(key == HID_KEY_Y) {
+        key = HID_KEY_Z;
+      } else if(key == HID_KEY_Z) {
+        key = HID_KEY_Y;
+      }
+    #endif
     
     key -= HID_KEY_A;
     
@@ -193,12 +217,33 @@ void cdc_send_key(u8 key) {
     } else {
       seq[0] = lower[key - HID_KEY_1];
     }
-    cdc_write(1);
+    if(seq[0]) cdc_write(1);
     
-  } else if(key >= HID_KEY_KEYPAD_DIVIDE && key <= HID_KEY_EUROPE_2) {
+  } else if(key >= HID_KEY_KEYPAD_DIVIDE && key <= HID_KEY_KEYPAD_DECIMAL) {
     
-    seq[0] = numpd[key - HID_KEY_KEYPAD_DIVIDE];
-    cdc_write(1);
+    if(key >= HID_KEY_KEYPAD_1 && !(kb_leds & KEYBOARD_LED_NUMLOCK)) {
+      seq[0] = '\e';
+      seq[1] = '[';
+      seq[3] = '~';
+      
+      if(key == HID_KEY_KEYPAD_0 || key % 2) {
+        if(key == HID_KEY_KEYPAD_7) seq[2] = '1';
+        if(key == HID_KEY_KEYPAD_0) seq[2] = '2';
+        if(key == HID_KEY_KEYPAD_1) seq[2] = '4';
+        if(key == HID_KEY_KEYPAD_9) seq[2] = '5';
+        if(key == HID_KEY_KEYPAD_3) seq[2] = '6';
+        if(key != HID_KEY_KEYPAD_5) cdc_write(4);
+      } else {
+        if(key == HID_KEY_KEYPAD_8) seq[2] = 'A';
+        if(key == HID_KEY_KEYPAD_2) seq[2] = 'B';
+        if(key == HID_KEY_KEYPAD_6) seq[2] = 'C';
+        if(key == HID_KEY_KEYPAD_4) seq[2] = 'D';
+        cdc_write(3);
+      }
+    } else {
+      seq[0] = numpd[key - HID_KEY_KEYPAD_DIVIDE];
+      cdc_write(1);
+    }
     
   }
   
@@ -236,6 +281,7 @@ void kb_reset() {
   ctrl = false;
   alt = false;
   shift = false;
+  altgr = false;
   add_alarm_in_ms(50, blink_callback, NULL, false);
 }
 
@@ -276,8 +322,14 @@ void kb_send_key(u8 key, bool state) {
   }
   
   if(key == HID_KEY_CONTROL_LEFT || key == HID_KEY_CONTROL_RIGHT) ctrl = state;
-  if(key == HID_KEY_ALT_LEFT     || key == HID_KEY_ALT_RIGHT    ) alt = state;
   if(key == HID_KEY_SHIFT_LEFT   || key == HID_KEY_SHIFT_RIGHT  ) shift = state;
+  
+  #ifdef QWERTZ
+    if(key == HID_KEY_ALT_LEFT) alt = state;
+    if(key == HID_KEY_ALT_RIGHT) altgr = state;
+  #else
+    if(key == HID_KEY_ALT_LEFT   || key == HID_KEY_ALT_RIGHT    ) alt = state;
+  #endif
 }
 
 void tuh_cdc_mount_cb(u8 idx) {
