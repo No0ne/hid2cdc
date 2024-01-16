@@ -29,34 +29,19 @@
 #include "tusb.h"
 
 typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-
-#ifdef QWERTZ
-  u8 const lower[] = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ',0x0,0x0,0x0,'+',0x0, '#',0x0,0x0,'^',',','.','-' };
-  u8 const upper[] = { '!','"',0x0,'$','%','&','/','(',')','=','\r','\e','\b','\t',' ','?',0x0,0x0,'*',0x0,'\'',0x0,0x0,'`',';',':','_' };
-  u8 const numpd[] = { '/','*','-','+','\r','1','2','3','4','5','6','7','8','9','0',',' };
-#else
-  u8 const lower[] = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ','-','=','[',']','\\',0x0,';','\'','`',',','.','/' };
-  u8 const upper[] = { '!','@','#','$','%','^','&','*','(',')','\r','\e','\b','\t',' ','_','+','{','}','|', 0x0,':','\"','~','<','>','?' };
-  u8 const numpd[] = { '/','*','-','+','\r','1','2','3','4','5','6','7','8','9','0','.' };
-#endif
+alarm_id_t repeater;
 
 u8 const FS = 0x1c;
 u8 const GS = 0x1d;
 u8 const RS = 0x1e;
 u8 const US = 0x1f;
 
-alarm_id_t repeater;
-u8 repeat = 0;
-u16 const delay_ms = 250;
-u32 const repeat_us = 50000;
-
 bool blinking = false;
 bool ctrl = false;
 bool alt = false;
 bool shift = false;
 bool altgr = false;
+bool qwertz = false;
 
 u8 kb_addr = 0;
 u8 kb_inst = 0;
@@ -64,6 +49,9 @@ u8 kb_leds = 0;
 
 u8 prev_rpt[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 u8 seq[] = { 0, 0, 0, 0, 0 };
+
+u8 lower[27];
+u8 upper[27];
 
 void cdc_write(u8 seqsize) {
   printf(", CDC bytes:");
@@ -83,7 +71,7 @@ void cdc_write(u8 seqsize) {
 void cdc_send_key(u8 key) {
   printf("HID code = %02x", key);
   
-  if(key == HID_KEY_DELETE || key == HID_KEY_KEYPAD_DECIMAL && !(kb_leds & KEYBOARD_LED_NUMLOCK)) {
+  if(key == HID_KEY_DELETE || key == HID_KEY_KEYPAD_DECIMAL) {
     
     if(ctrl && (alt || altgr)) {
       printf(" + ctrl + alt, resetting...\n\n");
@@ -91,22 +79,25 @@ void cdc_send_key(u8 key) {
       board_led_write(0);
       watchdog_enable(100, false);
       while(1);
+      
+    } else if(key == HID_KEY_KEYPAD_DECIMAL && kb_leds & KEYBOARD_LED_NUMLOCK) {
+      seq[0] = qwertz ? ',' : '.';
+      
     } else {
       seq[0] = 0x7f;
-      cdc_write(1);
     }
+    cdc_write(1);
     
   } else if(key == HID_KEY_EUROPE_2) {
-    #ifdef QWERTZ
-      if(altgr) {
-        seq[0] = '|';
-      } else if(shift) {
-        seq[0] = '>';
-      } else {
-        seq[0] = '<';
-      }
-      cdc_write(1);
-    #endif
+    if(altgr) {
+      seq[0] = '|';
+    } else if(shift) {
+      seq[0] = '>';
+    } else {
+      seq[0] = '<';
+    }
+    cdc_write(1);
+    
   } else if(altgr && (key >= HID_KEY_7 && key <= HID_KEY_0 || key == HID_KEY_MINUS || key == HID_KEY_BRACKET_RIGHT)) {
     
     if(key == HID_KEY_7) seq[0] = '{';
@@ -188,13 +179,11 @@ void cdc_send_key(u8 key) {
     
   } else if(key >= HID_KEY_A && key <= HID_KEY_Z) {
     
-    #ifdef QWERTZ
-      if(key == HID_KEY_Y) {
-        key = HID_KEY_Z;
-      } else if(key == HID_KEY_Z) {
-        key = HID_KEY_Y;
-      }
-    #endif
+    if(qwertz && key == HID_KEY_Y) {
+      key = HID_KEY_Z;
+    } else if(qwertz && key == HID_KEY_Z) {
+      key = HID_KEY_Y;
+    }
     
     key -= HID_KEY_A;
     
@@ -219,7 +208,7 @@ void cdc_send_key(u8 key) {
     }
     if(seq[0]) cdc_write(1);
     
-  } else if(key >= HID_KEY_KEYPAD_DIVIDE && key <= HID_KEY_KEYPAD_DECIMAL) {
+  } else if(key >= HID_KEY_KEYPAD_DIVIDE && key <= HID_KEY_KEYPAD_0) {
     
     if(key >= HID_KEY_KEYPAD_1 && !(kb_leds & KEYBOARD_LED_NUMLOCK)) {
       seq[0] = '\e';
@@ -241,7 +230,7 @@ void cdc_send_key(u8 key) {
         cdc_write(3);
       }
     } else {
-      seq[0] = numpd[key - HID_KEY_KEYPAD_DIVIDE];
+      seq[0] = { '/','*','-','+','\r','1','2','3','4','5','6','7','8','9','0' }[key - HID_KEY_KEYPAD_DIVIDE];
       cdc_write(1);
     }
     
@@ -270,7 +259,7 @@ int64_t blink_callback(alarm_id_t id, void *user_data) {
     return 500000;
   }
   
-  kb_leds = 0;
+  kb_leds = gpio_get(NUMLOCK) ? 0 : KEYBOARD_LED_NUMLOCK;
   kb_set_leds();
   return 0;
 }
@@ -288,7 +277,7 @@ void kb_reset() {
 int64_t repeat_callback(alarm_id_t id, void *user_data) {
   if(repeat) {
     cdc_send_key(repeat);
-    return repeat_us;
+    return REPEATUS;
   }
   
   repeater = 0;
@@ -314,7 +303,7 @@ void kb_send_key(u8 key, bool state) {
       //kb_set_led(KEYBOARD_LED_SCROLLLOCK);
       
     } else if(key <= HID_KEY_EUROPE_2) {
-      repeater = add_alarm_in_ms(delay_ms, repeat_callback, NULL, false);
+      repeater = add_alarm_in_ms(DELAYMS, repeat_callback, NULL, false);
       cdc_send_key(key);
     }
   } else {
@@ -323,13 +312,8 @@ void kb_send_key(u8 key, bool state) {
   
   if(key == HID_KEY_CONTROL_LEFT || key == HID_KEY_CONTROL_RIGHT) ctrl = state;
   if(key == HID_KEY_SHIFT_LEFT   || key == HID_KEY_SHIFT_RIGHT  ) shift = state;
-  
-  #ifdef QWERTZ
-    if(key == HID_KEY_ALT_LEFT) alt = state;
-    if(key == HID_KEY_ALT_RIGHT) altgr = state;
-  #else
-    if(key == HID_KEY_ALT_LEFT   || key == HID_KEY_ALT_RIGHT    ) alt = state;
-  #endif
+  if(key == HID_KEY_ALT_LEFT) alt = state;
+  if(key == HID_KEY_ALT_RIGHT) altgr = state;
 }
 
 void tuh_cdc_mount_cb(u8 idx) {
@@ -346,7 +330,7 @@ void tuh_cdc_umount_cb(u8 idx) {
   kb_reset();
 }
 
-void tuh_hid_mount_cb(u8 dev_addr, u8 instance, u8 const* desc_report, u16 desc_len) {
+void tuh_hid_mount_cb(u8 dev_addr, u8 instance, u8 const* desc_report, uint16_t desc_len) {
   printf("HID device address = %d, instance = %d is mounted", dev_addr, instance);
   
   if(tuh_hid_interface_protocol(dev_addr, instance) == HID_ITF_PROTOCOL_KEYBOARD) {
@@ -376,7 +360,7 @@ void tuh_hid_umount_cb(u8 dev_addr, u8 instance) {
   printf("\n");
 }
 
-void tuh_hid_report_received_cb(u8 dev_addr, u8 instance, u8 const* report, u16 len) {
+void tuh_hid_report_received_cb(u8 dev_addr, u8 instance, u8 const* report, uint16_t len) {
   if(tuh_hid_interface_protocol(dev_addr, instance) == HID_ITF_PROTOCOL_KEYBOARD && report[1] == 0) {
     
     if(report[0] != prev_rpt[0]) {
@@ -436,11 +420,27 @@ void main() {
   board_init();
   tuh_init(BOARD_TUH_RHPORT);
   gpio_init(CTRLALTDEL);
+  gpio_init(NUMLOCK);
+  gpio_init(QWERTZ);
   gpio_set_dir(CTRLALTDEL, GPIO_OUT);
+  gpio_set_dir(NUMLOCK, GPIO_IN);
+  gpio_set_dir(QWERTZ, GPIO_IN);
+  gpio_pull_up(NUMLOCK);
+  gpio_pull_up(QWERTZ);
   
   gpio_put(CTRLALTDEL, 1);
   board_led_write(1);
-  printf("\n%s-%s\n", PICO_PROGRAM_NAME, PICO_PROGRAM_VERSION_STRING);
+  qwertz = !gpio_get(QWERTZ);
+  
+  if(qwertz) {
+    lower = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ',0x0,0x0,0x0,'+',0x0, '#',0x0,0x0,'^',',','.','-' };
+    upper = { '!','"',0x0,'$','%','&','/','(',')','=','\r','\e','\b','\t',' ','?',0x0,0x0,'*',0x0,'\'',0x0,0x0,'`',';',':','_' };
+  } else {
+    lower = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ','-','=','[',']','\\',0x0,';','\'','`',',','.','/' };
+    upper = { '!','@','#','$','%','^','&','*','(',')','\r','\e','\b','\t',' ','_','+','{','}','|', 0x0,':','\"','~','<','>','?' };
+  }
+  
+  printf("\n%s-%s numlock=%s qwertz=%s\n", PICO_PROGRAM_NAME, PICO_PROGRAM_VERSION_STRING, !gpio_get(NUMLOCK), qwertz);
   
   while(1) {
     tuh_task();

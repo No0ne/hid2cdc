@@ -17,11 +17,14 @@ pico_sdk_init()
 
 add_executable(hid2cdc hid2cdc.c)
 
-add_compile_definitions(CTRLALTDEL=3) # ctrl-alt-del reset output gpio
-add_compile_definitions(QWERTZ) # qwertz keyboard
+add_compile_definitions(CTRLALTDEL=3)   # ctrl-alt-del reset output GPIO
+add_compile_definitions(NUMLOCK=2)      # jumper GPIO to GND for initial numlock on
+add_compile_definitions(QWERTZ=6)       # jumper GPIO to GND for QWERTZ keyboard
+add_compile_definitions(DELAYMS=400)    # typematic delay in milliseconds
+add_compile_definitions(REPEATUS=50000) # typematic repeat interval in microseconds
 
 pico_set_program_name(hid2cdc "hid2cdc")
-pico_set_program_version(hid2cdc "0.9")
+pico_set_program_version(hid2cdc "1.0")
 
 pico_enable_stdio_uart(hid2cdc 1)
 pico_enable_stdio_usb(hid2cdc 0)
