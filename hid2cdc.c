@@ -29,12 +29,14 @@
 #include "tusb.h"
 
 typedef uint8_t u8;
-alarm_id_t repeater;
 
 u8 const FS = 0x1c;
 u8 const GS = 0x1d;
 u8 const RS = 0x1e;
 u8 const US = 0x1f;
+
+alarm_id_t repeater;
+u8 repeat = 0;
 
 bool blinking = false;
 bool ctrl = false;
@@ -50,8 +52,8 @@ u8 kb_leds = 0;
 u8 prev_rpt[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 u8 seq[] = { 0, 0, 0, 0, 0 };
 
-u8 lower[27];
-u8 upper[27];
+u8 lower[28];
+u8 upper[28];
 
 void cdc_write(u8 seqsize) {
   printf(", CDC bytes:");
@@ -206,7 +208,7 @@ void cdc_send_key(u8 key) {
     } else {
       seq[0] = lower[key - HID_KEY_1];
     }
-    if(seq[0]) cdc_write(1);
+    if(seq[0] != '\a') cdc_write(1);
     
   } else if(key >= HID_KEY_KEYPAD_DIVIDE && key <= HID_KEY_KEYPAD_0) {
     
@@ -230,7 +232,7 @@ void cdc_send_key(u8 key) {
         cdc_write(3);
       }
     } else {
-      seq[0] = { '/','*','-','+','\r','1','2','3','4','5','6','7','8','9','0' }[key - HID_KEY_KEYPAD_DIVIDE];
+      seq[0] = "/*-+\r1234567890"[key - HID_KEY_KEYPAD_DIVIDE];
       cdc_write(1);
     }
     
@@ -266,11 +268,11 @@ int64_t blink_callback(alarm_id_t id, void *user_data) {
 
 void kb_reset() {
   repeat = 0;
-  blinking = true;
   ctrl = false;
   alt = false;
   shift = false;
   altgr = false;
+  blinking = true;
   add_alarm_in_ms(50, blink_callback, NULL, false);
 }
 
@@ -312,8 +314,13 @@ void kb_send_key(u8 key, bool state) {
   
   if(key == HID_KEY_CONTROL_LEFT || key == HID_KEY_CONTROL_RIGHT) ctrl = state;
   if(key == HID_KEY_SHIFT_LEFT   || key == HID_KEY_SHIFT_RIGHT  ) shift = state;
-  if(key == HID_KEY_ALT_LEFT) alt = state;
-  if(key == HID_KEY_ALT_RIGHT) altgr = state;
+  
+  if(qwertz) {
+    if(key == HID_KEY_ALT_LEFT) alt = state;
+    if(key == HID_KEY_ALT_RIGHT) altgr = state;
+  } else {
+    if(key == HID_KEY_ALT_LEFT   || key == HID_KEY_ALT_RIGHT    ) alt = state;
+  }
 }
 
 void tuh_cdc_mount_cb(u8 idx) {
@@ -428,19 +435,13 @@ void main() {
   gpio_pull_up(NUMLOCK);
   gpio_pull_up(QWERTZ);
   
-  gpio_put(CTRLALTDEL, 1);
   board_led_write(1);
+  gpio_put(CTRLALTDEL, 1);
   qwertz = !gpio_get(QWERTZ);
+  strcpy(lower, qwertz ? "1234567890\r\e\b\t \a\a\a+\a#\a\a^,.-"  : "1234567890\r\e\b\t -=[]\\\a;'`,./");
+  strcpy(upper, qwertz ? "!\"\a$%&/()=\r\e\b\t ?\a\a*\a'\a\a`;:_" : "!@#$%^&*()\r\e\b\t _+{}|\a:\"~<>?");
   
-  if(qwertz) {
-    lower = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ',0x0,0x0,0x0,'+',0x0, '#',0x0,0x0,'^',',','.','-' };
-    upper = { '!','"',0x0,'$','%','&','/','(',')','=','\r','\e','\b','\t',' ','?',0x0,0x0,'*',0x0,'\'',0x0,0x0,'`',';',':','_' };
-  } else {
-    lower = { '1','2','3','4','5','6','7','8','9','0','\r','\e','\b','\t',' ','-','=','[',']','\\',0x0,';','\'','`',',','.','/' };
-    upper = { '!','@','#','$','%','^','&','*','(',')','\r','\e','\b','\t',' ','_','+','{','}','|', 0x0,':','\"','~','<','>','?' };
-  }
-  
-  printf("\n%s-%s numlock=%s qwertz=%s\n", PICO_PROGRAM_NAME, PICO_PROGRAM_VERSION_STRING, !gpio_get(NUMLOCK), qwertz);
+  printf("\n%s-%s numlock=%u qwertz=%u\n", PICO_PROGRAM_NAME, PICO_PROGRAM_VERSION_STRING, !gpio_get(NUMLOCK), qwertz);
   
   while(1) {
     tuh_task();
