@@ -192,6 +192,9 @@ void cdc_send_key(u8 key) {
     if(ctrl) {
       seq[0] = key + 1;
       
+    } else if(qwertz && altgr && key == HID_KEY_Q - HID_KEY_A) {
+      seq[0] = '@';
+      
     } else if(shift || kb_leds & KEYBOARD_LED_CAPSLOCK) {
       seq[0] = key + 'A';
       
