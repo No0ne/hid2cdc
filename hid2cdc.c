@@ -100,8 +100,10 @@ void cdc_send_key(u8 key) {
     }
     cdc_write(1);
     
-  } else if(altgr && (key >= HID_KEY_7 && key <= HID_KEY_0 || key == HID_KEY_MINUS || key == HID_KEY_BRACKET_RIGHT)) {
+  } else if(altgr && (key >= HID_KEY_7 && key <= HID_KEY_0 || key == HID_KEY_MINUS || key == HID_KEY_BRACKET_RIGHT || key == HID_KEY_2 || key == HID_KEY_4)) {
     
+    if(key == HID_KEY_2) seq[0] = '@';
+    if(key == HID_KEY_4) seq[0] = '$';
     if(key == HID_KEY_7) seq[0] = '{';
     if(key == HID_KEY_8) seq[0] = '[';
     if(key == HID_KEY_9) seq[0] = ']';
@@ -181,19 +183,19 @@ void cdc_send_key(u8 key) {
     
   } else if(key >= HID_KEY_A && key <= HID_KEY_Z) {
     
-    if(qwertz && key == HID_KEY_Y) {
+    /*if(qwertz && key == HID_KEY_Y) {
       key = HID_KEY_Z;
     } else if(qwertz && key == HID_KEY_Z) {
       key = HID_KEY_Y;
-    }
+    }*/
     
     key -= HID_KEY_A;
     
     if(ctrl) {
       seq[0] = key + 1;
       
-    } else if(qwertz && altgr && key == HID_KEY_Q - HID_KEY_A) {
-      seq[0] = '@';
+    /*} else if(qwertz && altgr && key == HID_KEY_Q - HID_KEY_A) {
+      seq[0] = '@';*/
       
     } else if(shift || kb_leds & KEYBOARD_LED_CAPSLOCK) {
       seq[0] = key + 'A';
@@ -441,10 +443,11 @@ void main() {
   board_led_write(1);
   gpio_put(CTRLALTDEL, 1);
   qwertz = !gpio_get(QWERTZ);
-  strcpy(lower, qwertz ? "1234567890\r\e\b\t \a\a\a+\a#\a\a^,.-"  : "1234567890\r\e\b\t -=[]\\\a;'`,./");
-  strcpy(upper, qwertz ? "!\"\a$%&/()=\r\e\b\t ?\a\a*\a'\a\a`;:_" : "!@#$%^&*()\r\e\b\t _+{}|\a:\"~<>?");
+  qwertz = true;
+  strcpy(lower, qwertz ? "1234567890\r\e\b\t +\a\a\a\a'\a\a\a,.-"  : "1234567890\r\e\b\t -=[]\\\a;'`,./");
+  strcpy(upper, qwertz ? "!\"#\a%&/()=\r\e\b\t ?\a\a^\a*\a\a\a;:_" : "!@#$%^&*()\r\e\b\t _+{}|\a:\"~<>?");
   
-  printf("\n%s-%s numlock=%u qwertz=%u\n", PICO_PROGRAM_NAME, PICO_PROGRAM_VERSION_STRING, !gpio_get(NUMLOCK), qwertz);
+  printf("\n%s-%s numlock=%u swedish=%u\n", PICO_PROGRAM_NAME, PICO_PROGRAM_VERSION_STRING, !gpio_get(NUMLOCK), qwertz);
   
   while(1) {
     tuh_task();
