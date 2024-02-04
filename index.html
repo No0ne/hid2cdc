@@ -1,1 +1,108 @@
-<h1>hid2cdc config generator</h1>
+<!doctype html>
+<!--
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2024 No0ne (https://github.com/No0ne)
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ */
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>hid2cdc config generator</title>
+  <style>
+    body { font-family: monospace; width: 50%; margin: 0 auto; line-height: 2; }
+    td { padding-right: 4em; padding-bottom: 2em; white-space: nowrap; }
+    th { vertical-align: top; text-align: right; }
+    input { margin: 0 1em; }
+    p { text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>hid2cdc config generator</h1>
+  This is a configuration file generator for the <a href="https://github.com/No0ne/hid2cdc">hid2cdc</a> project.
+  Select your options and simply flash the config UF2 file in addition to the <a href="https://github.com/No0ne/hid2cdc/releases">hid2cdc.uf2</a>
+  onto your Raspberry Pi Pico using the BOOTSEL button (file order doesn't matter).
+  <br><br>
+  <table>
+    <tr>
+      <th>keyboard layout</th>
+      <td>
+        <label><input type="radio" name="layout" value="1" checked>English US</label><br>
+        <label><input type="radio" name="layout" value="2">German</label><br>
+        <label><input type="radio" name="layout" value="3">Swedish</label><br>
+      </td>
+      <th>typematic delay<br>milliseconds:<input type="number" name="delayms" min="250" max="1000" step="250" value="500"></th>
+    </tr>
+    <tr>
+      <th>default numlock state</th>
+      <td>
+        <label><input type="radio" name="numlock" value="0" checked>off</label><br>
+        <label><input type="radio" name="numlock" value="1">on</label><br>
+      </td>
+      <th>typematic repeat interval<br>characters per second:<input type="number" name="repeatchr" min="2" max="30" step="2" value="20"></th>
+    </tr>
+  </table>
+  <p><a download="hid2cdc-config.uf2">generate hid2cdc-config.uf2</a></p>
+  <script>
+    function genuf2() {
+      const uf2 = new ArrayBuffer(512);
+      const u8 = new Uint8Array(uf2);
+      
+      /* * * * * https://github.com/microsoft/uf2 * * * * */
+      u8[0] = 0x55; u8[1] = 0x46; u8[2] = 0x32; u8[3] = 0x0a; // First magic number: 0x0A324655
+      u8[4] = 0x57; u8[5] = 0x51; u8[6] = 0x5d; u8[7] = 0x9e; // Second magic number: 0x9E5D5157
+      u8[9] = 0x20; // Flags: familyID present
+      u8[14] = 0x01; u8[15] = 0x10; // Address in flash where the data should be written
+      u8[17] = 0x01; // Number of bytes used in data: 256
+      u8[24] = 0x01; // Total number of blocks in file: 1
+      u8[28] = 0x56; u8[29] = 0xff; u8[30] = 0x8b; u8[31] = 0xe4; // familyID: Raspberry Pi RP2040
+      u8[508] = 0x30; u8[509] = 0x6f; u8[510] = 0xb1; u8[511] = 0x0a; // Final magic number: 0x0AB16F30
+      /* * * * * * * * * * * * * * * * * * * * * * * * * */
+      
+      u8[32] = 0x68; u8[33] = 0x69; u8[34] = 0x64; u8[35] = 0x32; u8[36] = 0x63; u8[37] = 0x64; u8[38] = 0x63;
+      u8[39] = 0x01; // magic number: hid2cdc + config version
+      
+      u8[40] = document.querySelector('input[name="layout"]:checked').value;
+      u8[41] = document.querySelector('input[name="numlock"]:checked').value;
+      
+      const delayms = document.querySelector('input[name="delayms"]').value;
+      u8[42] = delayms;
+      u8[43] = delayms >> 8;
+      
+      const repeatus = Math.round(1000000 / document.querySelector('input[name="repeatchr"]').value);
+      u8[44] = repeatus;
+      u8[45] = repeatus >> 8;
+      u8[46] = repeatus >> 16;
+      u8[47] = repeatus >> 24;
+      
+      document.querySelector('a[download]').setAttribute('href', URL.createObjectURL(new Blob([uf2])));
+    }
+    
+    document.querySelectorAll('input').forEach(item => {
+      item.addEventListener('change', genuf2);
+    });
+    
+    genuf2();
+  </script>
+</body>
+</html>
